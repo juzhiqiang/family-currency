@@ -9,12 +9,13 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.EXPLORER_PORT || 3000;
+const WS_PORT = process.env.EXPLORER_WS_PORT || 3002; // 修改WebSocket端口
 
 // 创建区块链实例
 const blockchain = new Blockchain();
 
-// WebSocket 服务器用于实时更新
-const wss = new WebSocketServer({ port: 3001 });
+// WebSocket 服务器用于实时更新 - 使用不同的端口
+const wss = new WebSocketServer({ port: WS_PORT });
 
 // 中间件
 app.use(express.json());
@@ -304,7 +305,7 @@ setInterval(() => {
 app.listen(PORT, () => {
   console.log(`🌐 Family Currency 区块链浏览器启动!`);
   console.log(`📡 浏览器地址: http://localhost:${PORT}`);
-  console.log(`🔌 WebSocket: ws://localhost:3001`);
+  console.log(`🔌 WebSocket: ws://localhost:${WS_PORT}`);
 });
 
 // 优雅关闭
