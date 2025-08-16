@@ -69,10 +69,19 @@ export class Block {
   }
 
   /**
-   * 获取区块大小（字节）
+   * 获取区块大小（字节） - 避免循环引用
    */
   getSize() {
-    return Buffer.byteLength(JSON.stringify(this), 'utf8');
+    // 创建一个不包含 size 的临时对象来计算大小
+    const tempObj = {
+      timestamp: this.timestamp,
+      transactions: this.transactions.map(tx => tx.toJSON ? tx.toJSON() : tx),
+      previousHash: this.previousHash,
+      hash: this.hash,
+      nonce: this.nonce,
+      miner: this.miner
+    };
+    return Buffer.byteLength(JSON.stringify(tempObj), 'utf8');
   }
 
   /**
