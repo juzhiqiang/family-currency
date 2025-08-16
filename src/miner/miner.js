@@ -84,7 +84,8 @@ class Miner {
         return;
       }
 
-      console.log(`⛏️  开始挖掘新区块 (难度: ${miningInfo.difficulty}, 待处理交易: ${miningInfo.pendingTransactions})`);\n      const startTime = Date.now();
+      console.log(`⛏️  开始挖掘新区块 (难度: ${miningInfo.difficulty}, 待处理交易: ${miningInfo.pendingTransactions})`);
+      const startTime = Date.now();
 
       // 调用主节点的挖矿API
       const result = await this.callMineAPI();
@@ -275,13 +276,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   
   // 处理退出信号
   process.on('SIGINT', () => {
-    console.log('\\n🛑 正在关闭挖矿程序...');
+    console.log('\n🛑 正在关闭挖矿程序...');
     miner.stop();
     process.exit(0);
   });
   
   process.on('SIGTERM', () => {
-    console.log('\\n🛑 正在关闭挖矿程序...');
+    console.log('\n🛑 正在关闭挖矿程序...');
     miner.stop();
     process.exit(0);
   });
@@ -299,4 +300,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     // 启动挖矿
     miner.start();
   }, 2000);
-}\n\nexport { Miner };
+}
+
+export { Miner };
