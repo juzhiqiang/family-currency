@@ -1,14 +1,15 @@
-import { Blockchain } from '../blockchain/Blockchain.js';
 import { Wallet } from '../crypto/Wallet.js';
 
 class Miner {
   constructor() {
-    this.blockchain = new Blockchain();
     this.wallet = Wallet.generate();
     this.isRunning = false;
     this.hashRate = 0;
     this.totalHashes = 0;
     this.blocksFound = 0;
+    this.nodeUrl = process.env.NODE_URL || 'http://localhost:3001';
+    this.miningReward = 100; // 默认挖矿奖励
+    this.difficulty = 2; // 默认难度
   }
 
   /**
@@ -23,16 +24,17 @@ class Miner {
     this.isRunning = true;
     console.log('⛏️  Family Currency 挖矿程序启动!');
     console.log(`👷 矿工地址: ${this.wallet.getAddress()}`);
-    console.log(`💎 挖矿奖励: ${this.blockchain.miningReward} FC`);
+    console.log(`💎 挖矿奖励: ${this.miningReward} FC`);
+    console.log(`🔗 连接节点: ${this.nodeUrl}`);
     console.log('─'.repeat(60));
 
     // 开始挖矿循环
     this.miningLoop();
 
-    // 每5秒显示一次挖矿统计
+    // 每10秒显示一次挖矿统计
     this.statsInterval = setInterval(() => {
       this.displayStats();
-    }, 5000);
+    }, 10000);
   }
 
   /**
@@ -54,10 +56,10 @@ class Miner {
       try {
         await this.mineBlock();
         // 挖到区块后短暂休息
-        await this.sleep(1000);
+        await this.sleep(2000);
       } catch (error) {
         console.error('❌ 挖矿过程中发生错误:', error.message);
-        await this.sleep(5000); // 错误后等待5秒再继续
+        await this.sleep(10000); // 错误后等待10秒再继续
       }
     }
   }
@@ -66,55 +68,148 @@ class Miner {
    * 挖掘单个区块
    */
   async mineBlock() {
-    // 检查是否有待处理的交易
-    if (this.blockchain.pendingTransactions.length === 0) {
-      // 没有交易时创建一个空区块（仅包含挖矿奖励）
-      console.log('📑 暂无待处理交易，等待中...');
-      await this.sleep(10000); // 等待10秒
-      return;
+    try {
+      // 首先获取挖矿信息
+      const miningInfo = await this.getMiningInfo();
+      if (!miningInfo) {
+        console.log('❌ 无法连接到节点，等待重试...');
+        await this.sleep(10000);
+        return;
+      }
+
+      // 检查是否有待处理的交易
+      if (miningInfo.pendingTransactions === 0) {
+        console.log('📑 暂无待处理交易，等待中...');
+        await this.sleep(10000);
+        return;
+      }
+
+      console.log(`⛏️  开始挖掘新区块 (难度: ${miningInfo.difficulty}, 待处理交易: ${miningInfo.pendingTransactions})`);\n      const startTime = Date.now();
+
+      // 调用主节点的挖矿API
+      const result = await this.callMineAPI();
+      
+      if (result && result.success && result.block) {
+        const endTime = Date.now();
+        const duration = (endTime - startTime) / 1000;
+        
+        this.blocksFound++;
+        
+        console.log('🎉 恭喜！挖到新区块!');
+        console.log(`   区块高度: ${result.block.height || 'unknown'}`);
+        console.log(`   区块哈希: ${result.block.hash}`);
+        console.log(`   挖矿耗时: ${duration.toFixed(2)}秒`);
+        console.log(`   获得奖励: ${this.miningReward} FC`);
+        console.log('─'.repeat(60));
+      } else if (result && !result.success) {
+        console.log(`⚠️  ${result.message || '挖矿失败'}`);
+      }
+    } catch (error) {
+      console.error('❌ 挖矿请求失败:', error.message);
     }
+  }
 
-    console.log(`⛏️  开始挖掘新区块 (难度: ${this.blockchain.difficulty})`);
-    const startTime = Date.now();
-    const startHashes = this.totalHashes;
+  /**
+   * 调用挖矿API
+   */
+  async callMineAPI() {
+    try {
+      const response = await fetch(`${this.nodeUrl}/api/mining/mine`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          minerAddress: this.wallet.getAddress()
+        })
+      });
 
-    // 执行挖矿
-    const block = this.blockchain.minePendingTransactions(this.wallet.getAddress());
-    
-    if (block) {
-      const endTime = Date.now();
-      const duration = (endTime - startTime) / 1000;
-      const hashesInThisBlock = this.totalHashes - startHashes;
-      
-      this.blocksFound++;
-      
-      console.log('🎉 恭喜！挖到新区块!');
-      console.log(`   区块高度: ${this.blockchain.chain.length - 1}`);
-      console.log(`   区块哈希: ${block.hash}`);
-      console.log(`   挖矿耗时: ${duration.toFixed(2)}秒`);
-      console.log(`   本次哈希: ${hashesInThisBlock.toLocaleString()}`);
-      console.log(`   获得奖励: ${this.blockchain.miningReward} FC`);
-      console.log(`   当前余额: ${this.blockchain.getBalance(this.wallet.getAddress())} FC`);
-      console.log('─'.repeat(60));
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw new Error(`API调用失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 获取挖矿信息
+   */
+  async getMiningInfo() {
+    try {
+      const response = await fetch(`${this.nodeUrl}/api/mining/info`);
+      if (!response.ok) {
+        return null;
+      }
+      const result = await response.json();
+      if (result.success) {
+        // 更新本地缓存的信息
+        this.difficulty = result.info.difficulty;
+        this.miningReward = result.info.miningReward;
+        return result.info;
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * 获取区块链统计信息
+   */
+  async getBlockchainStats() {
+    try {
+      const response = await fetch(`${this.nodeUrl}/api/blockchain/stats`);
+      if (!response.ok) {
+        return null;
+      }
+      const result = await response.json();
+      return result.success ? result.stats : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * 获取矿工余额
+   */
+  async getMinerBalance() {
+    try {
+      const response = await fetch(`${this.nodeUrl}/api/tokens/balance/${this.wallet.getAddress()}`);
+      if (!response.ok) {
+        return 0;
+      }
+      const result = await response.json();
+      return result.success ? result.balance : 0;
+    } catch (error) {
+      return 0;
     }
   }
 
   /**
    * 显示挖矿统计信息
    */
-  displayStats() {
+  async displayStats() {
     const uptime = process.uptime();
-    const avgHashRate = this.totalHashes / uptime;
-    const balance = this.blockchain.getBalance(this.wallet.getAddress());
+    const balance = await this.getMinerBalance();
+    const stats = await this.getBlockchainStats();
     
     console.log('📊 挖矿统计:');
     console.log(`   运行时间: ${this.formatTime(uptime)}`);
     console.log(`   已挖区块: ${this.blocksFound}`);
-    console.log(`   总哈希数: ${this.totalHashes.toLocaleString()}`);
-    console.log(`   平均算力: ${avgHashRate.toFixed(2)} H/s`);
     console.log(`   当前余额: ${balance} FC`);
-    console.log(`   区块高度: ${this.blockchain.chain.length - 1}`);
-    console.log(`   待处理TX: ${this.blockchain.pendingTransactions.length}`);
+    console.log(`   矿工地址: ${this.wallet.getAddress().substring(0, 20)}...`);
+    
+    if (stats) {
+      console.log(`   区块高度: ${stats.height}`);
+      console.log(`   待处理TX: ${stats.pendingTransactions}`);
+      console.log(`   挖矿难度: ${stats.difficulty}`);
+      console.log(`   网络状态: ${stats.isValid ? '✅ 正常' : '❌ 异常'}`);
+    } else {
+      console.log(`   网络状态: ❌ 连接失败`);
+    }
     console.log('─'.repeat(60));
   }
 
@@ -136,58 +231,39 @@ class Miner {
   }
 
   /**
+   * 检查节点连接
+   */
+  async checkNodeConnection() {
+    try {
+      const response = await fetch(`${this.nodeUrl}/health`);
+      return response.ok;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * 获取挖矿信息
    */
-  getInfo() {
+  async getInfo() {
     const uptime = process.uptime();
-    const avgHashRate = this.totalHashes / uptime;
+    const balance = await this.getMinerBalance();
+    const stats = await this.getBlockchainStats();
+    const connected = await this.checkNodeConnection();
     
     return {
       isRunning: this.isRunning,
       minerAddress: this.wallet.getAddress(),
-      balance: this.blockchain.getBalance(this.wallet.getAddress()),
+      balance: balance,
       blocksFound: this.blocksFound,
-      totalHashes: this.totalHashes,
-      avgHashRate: avgHashRate.toFixed(2),
       uptime: this.formatTime(uptime),
-      currentHeight: this.blockchain.chain.length - 1,
-      pendingTransactions: this.blockchain.pendingTransactions.length,
-      difficulty: this.blockchain.difficulty,
-      miningReward: this.blockchain.miningReward
+      currentHeight: stats ? stats.height : 'unknown',
+      pendingTransactions: stats ? stats.pendingTransactions : 'unknown',
+      difficulty: stats ? stats.difficulty : 'unknown',
+      miningReward: this.miningReward,
+      nodeConnected: connected,
+      nodeUrl: this.nodeUrl
     };
-  }
-
-  /**
-   * 更新难度
-   */
-  adjustDifficulty() {
-    // 根据挖矿时间调整难度
-    const targetTime = 10000; // 10秒目标时间
-    const actualTime = this.getAverageBlockTime();
-    
-    if (actualTime < targetTime * 0.5) {
-      this.blockchain.difficulty++;
-      console.log(`🔼 难度增加到: ${this.blockchain.difficulty}`);
-    } else if (actualTime > targetTime * 2) {
-      this.blockchain.difficulty = Math.max(1, this.blockchain.difficulty - 1);
-      console.log(`🔽 难度降低到: ${this.blockchain.difficulty}`);
-    }
-  }
-
-  /**
-   * 获取平均出块时间
-   */
-  getAverageBlockTime() {
-    if (this.blockchain.chain.length < 2) return 10000;
-    
-    const recentBlocks = this.blockchain.chain.slice(-5); // 最近5个区块
-    let totalTime = 0;
-    
-    for (let i = 1; i < recentBlocks.length; i++) {
-      totalTime += recentBlocks[i].timestamp - recentBlocks[i-1].timestamp;
-    }
-    
-    return totalTime / (recentBlocks.length - 1);
   }
 }
 
@@ -199,24 +275,28 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   
   // 处理退出信号
   process.on('SIGINT', () => {
-    console.log('\n🛑 正在关闭挖矿程序...');
+    console.log('\\n🛑 正在关闭挖矿程序...');
     miner.stop();
     process.exit(0);
   });
   
   process.on('SIGTERM', () => {
-    console.log('\n🛑 正在关闭挖矿程序...');
+    console.log('\\n🛑 正在关闭挖矿程序...');
     miner.stop();
     process.exit(0);
   });
   
-  // 启动挖矿
-  miner.start();
-  
-  // 每30秒调整一次难度
-  setInterval(() => {
-    miner.adjustDifficulty();
-  }, 30000);
-}
-
-export { Miner };
+  // 等待一下再启动，确保主节点已经启动
+  setTimeout(async () => {
+    // 检查节点连接
+    const connected = await miner.checkNodeConnection();
+    if (!connected) {
+      console.log('❌ 无法连接到主节点，请确保主节点已启动 (npm start)');
+      console.log(`   尝试连接: ${miner.nodeUrl}`);
+      console.log('   等待节点启动...');
+    }
+    
+    // 启动挖矿
+    miner.start();
+  }, 2000);
+}\n\nexport { Miner };
