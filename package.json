@@ -1,0 +1,39 @@
+{
+  "name": "family-currency",
+  "version": "1.0.0",
+  "description": "A family-oriented cryptocurrency built with Cosmos SDK",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "explorer": "node src/explorer/server.js",
+    "miner": "node src/miner/miner.js",
+    "test": "node src/test/test.js"
+  },
+  "dependencies": {
+    "@cosmjs/amino": "^0.32.4",
+    "@cosmjs/crypto": "^0.32.4",
+    "@cosmjs/encoding": "^0.32.4",
+    "@cosmjs/math": "^0.32.4",
+    "@cosmjs/proto-signing": "^0.32.4",
+    "@cosmjs/stargate": "^0.32.4",
+    "@cosmjs/tendermint-rpc": "^0.32.4",
+    "express": "^4.19.2",
+    "ws": "^8.17.1",
+    "crypto": "^1.0.1",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  },
+  "keywords": [
+    "blockchain",
+    "cryptocurrency",
+    "cosmos",
+    "family",
+    "token"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
