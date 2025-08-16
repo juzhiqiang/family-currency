@@ -10,23 +10,33 @@ class Miner {
     this.nodeUrl = process.env.NODE_URL || 'http://localhost:3001';
     this.miningReward = 100; // 默认挖矿奖励
     this.difficulty = 2; // 默认难度
+    this.retryCount = 0;
+    this.maxRetries = 10;
   }
 
   /**
    * 开始挖矿
    */
-  start() {
+  async start() {
     if (this.isRunning) {
       console.log('⚠️  挖矿程序已在运行中...');
       return;
     }
 
-    this.isRunning = true;
     console.log('⛏️  Family Currency 挖矿程序启动!');
     console.log(`👷 矿工地址: ${this.wallet.getAddress()}`);
     console.log(`💎 挖矿奖励: ${this.miningReward} FC`);
     console.log(`🔗 连接节点: ${this.nodeUrl}`);
     console.log('─'.repeat(60));
+
+    // 首先检查节点连接
+    const connected = await this.waitForNodeConnection();
+    if (!connected) {
+      console.log('❌ 无法连接到主节点，挖矿程序退出');
+      process.exit(1);
+    }
+
+    this.isRunning = true;
 
     // 开始挖矿循环
     this.miningLoop();
@@ -35,6 +45,30 @@ class Miner {
     this.statsInterval = setInterval(() => {
       this.displayStats();
     }, 10000);
+  }
+
+  /**
+   * 等待节点连接
+   */
+  async waitForNodeConnection() {
+    console.log('🔍 检查主节点连接...');
+    
+    for (let i = 0; i < this.maxRetries; i++) {
+      const connected = await this.checkNodeConnection();
+      
+      if (connected) {
+        console.log('✅ 主节点连接成功！');
+        return true;
+      }
+      
+      console.log(`❌ 连接失败 (${i + 1}/${this.maxRetries})，${3}秒后重试...`);
+      console.log(`   检查是否已启动主节点: npm start`);
+      await this.sleep(3000);
+    }
+    
+    console.log('❌ 达到最大重试次数，无法连接到主节点');
+    console.log('   请确保主节点已启动并运行在端口 3001');
+    return false;
   }
 
   /**
@@ -52,6 +86,8 @@ class Miner {
    * 挖矿主循环
    */
   async miningLoop() {
+    console.log('🔄 开始挖矿循环...');
+    
     while (this.isRunning) {
       try {
         await this.mineBlock();
@@ -59,9 +95,24 @@ class Miner {
         await this.sleep(2000);
       } catch (error) {
         console.error('❌ 挖矿过程中发生错误:', error.message);
-        await this.sleep(10000); // 错误后等待10秒再继续
+        
+        // 检查是否是网络连接问题
+        const connected = await this.checkNodeConnection();
+        if (!connected) {
+          console.log('🔌 检测到网络断开，尝试重新连接...');
+          const reconnected = await this.waitForNodeConnection();
+          if (!reconnected) {
+            console.log('❌ 重连失败，挖矿程序退出');
+            this.stop();
+            break;
+          }
+        }
+        
+        await this.sleep(5000); // 错误后等待5秒再继续
       }
     }
+    
+    console.log('🏁 挖矿循环结束');
   }
 
   /**
@@ -72,7 +123,7 @@ class Miner {
       // 首先获取挖矿信息
       const miningInfo = await this.getMiningInfo();
       if (!miningInfo) {
-        console.log('❌ 无法连接到节点，等待重试...');
+        console.log('❌ 无法获取挖矿信息，等待重试...');
         await this.sleep(10000);
         return;
       }
@@ -107,6 +158,7 @@ class Miner {
       }
     } catch (error) {
       console.error('❌ 挖矿请求失败:', error.message);
+      throw error; // 重新抛出错误，让上层处理
     }
   }
 
@@ -122,7 +174,8 @@ class Miner {
         },
         body: JSON.stringify({
           minerAddress: this.wallet.getAddress()
-        })
+        }),
+        timeout: 30000 // 30秒超时
       });
 
       if (!response.ok) {
@@ -140,10 +193,14 @@ class Miner {
    */
   async getMiningInfo() {
     try {
-      const response = await fetch(`${this.nodeUrl}/api/mining/info`);
+      const response = await fetch(`${this.nodeUrl}/api/mining/info`, {
+        timeout: 10000 // 10秒超时
+      });
+      
       if (!response.ok) {
         return null;
       }
+      
       const result = await response.json();
       if (result.success) {
         // 更新本地缓存的信息
@@ -153,6 +210,7 @@ class Miner {
       }
       return null;
     } catch (error) {
+      console.error('获取挖矿信息失败:', error.message);
       return null;
     }
   }
@@ -162,10 +220,14 @@ class Miner {
    */
   async getBlockchainStats() {
     try {
-      const response = await fetch(`${this.nodeUrl}/api/blockchain/stats`);
+      const response = await fetch(`${this.nodeUrl}/api/blockchain/stats`, {
+        timeout: 10000
+      });
+      
       if (!response.ok) {
         return null;
       }
+      
       const result = await response.json();
       return result.success ? result.stats : null;
     } catch (error) {
@@ -178,10 +240,14 @@ class Miner {
    */
   async getMinerBalance() {
     try {
-      const response = await fetch(`${this.nodeUrl}/api/tokens/balance/${this.wallet.getAddress()}`);
+      const response = await fetch(`${this.nodeUrl}/api/tokens/balance/${this.wallet.getAddress()}`, {
+        timeout: 10000
+      });
+      
       if (!response.ok) {
         return 0;
       }
+      
       const result = await response.json();
       return result.success ? result.balance : 0;
     } catch (error) {
@@ -236,7 +302,9 @@ class Miner {
    */
   async checkNodeConnection() {
     try {
-      const response = await fetch(`${this.nodeUrl}/health`);
+      const response = await fetch(`${this.nodeUrl}/health`, {
+        timeout: 5000 // 5秒超时
+      });
       return response.ok;
     } catch (error) {
       return false;
@@ -273,33 +341,46 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const miner = new Miner();
   
   console.log('🚀 启动 Family Currency 挖矿程序...');
+  console.log(`📋 进程ID: ${process.pid}`);
+  console.log(`🌐 Node.js 版本: ${process.version}`);
   
   // 处理退出信号
   process.on('SIGINT', () => {
-    console.log('\n🛑 正在关闭挖矿程序...');
+    console.log('\n🛑 接收到退出信号，正在关闭挖矿程序...');
     miner.stop();
-    process.exit(0);
+    setTimeout(() => {
+      console.log('👋 挖矿程序已安全关闭');
+      process.exit(0);
+    }, 1000);
   });
   
   process.on('SIGTERM', () => {
-    console.log('\n🛑 正在关闭挖矿程序...');
+    console.log('\n🛑 接收到终止信号，正在关闭挖矿程序...');
     miner.stop();
-    process.exit(0);
+    setTimeout(() => {
+      console.log('👋 挖矿程序已安全关闭');
+      process.exit(0);
+    }, 1000);
+  });
+
+  // 捕获未处理的异常
+  process.on('uncaughtException', (error) => {
+    console.error('💥 未捕获的异常:', error);
+    miner.stop();
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('💥 未处理的Promise拒绝:', reason);
+    miner.stop();
+    process.exit(1);
   });
   
-  // 等待一下再启动，确保主节点已经启动
-  setTimeout(async () => {
-    // 检查节点连接
-    const connected = await miner.checkNodeConnection();
-    if (!connected) {
-      console.log('❌ 无法连接到主节点，请确保主节点已启动 (npm start)');
-      console.log(`   尝试连接: ${miner.nodeUrl}`);
-      console.log('   等待节点启动...');
-    }
-    
-    // 启动挖矿
-    miner.start();
-  }, 2000);
+  // 启动挖矿程序
+  miner.start().catch(error => {
+    console.error('💥 启动挖矿程序失败:', error);
+    process.exit(1);
+  });
 }
 
 export { Miner };
