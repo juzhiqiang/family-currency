@@ -8,6 +8,7 @@ export class Transaction {
     this.amount = amount;
     this.type = type; // 'transfer', 'mint', 'burn'
     this.timestamp = Date.now();
+    this.nonce = Math.random(); // 添加随机数确保唯一性
     this.signature = '';
     this.txId = this.calculateTxId();
   }
@@ -23,7 +24,8 @@ export class Transaction {
         this.toAddress +
         this.amount +
         this.type +
-        this.timestamp
+        this.timestamp +
+        this.nonce
       )
       .digest('hex');
   }
@@ -39,7 +41,8 @@ export class Transaction {
         this.toAddress +
         this.amount +
         this.type +
-        this.timestamp
+        this.timestamp +
+        this.nonce
       )
       .digest('hex');
   }
@@ -129,6 +132,7 @@ export class Transaction {
       amount: this.amount,
       type: this.type,
       timestamp: this.timestamp,
+      nonce: this.nonce,
       signature: this.signature,
       fee: this.getFee()
     };

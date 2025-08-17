@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Blockchain } from '../blockchain/Blockchain.js';
 import { WebSocketServer } from 'ws';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -10,9 +9,23 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.EXPLORER_PORT || 3000;
 const WS_PORT = process.env.EXPLORER_WS_PORT || 3002; // 修改WebSocket端口
+const NODE_API_URL = process.env.NODE_API_URL || 'http://localhost:3001';
 
-// 创建区块链实例
-const blockchain = new Blockchain();
+// 浏览器不再维护自己的区块链实例，而是从主节点获取数据
+
+// 从主节点获取数据的辅助函数
+async function fetchFromNode(endpoint) {
+  try {
+    const response = await fetch(`${NODE_API_URL}${endpoint}`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Failed to fetch from node: ${endpoint}`, error);
+    return { success: false, error: error.message };
+  }
+}
 
 // WebSocket 服务器用于实时更新 - 使用不同的端口
 const wss = new WebSocketServer({ port: WS_PORT });
@@ -26,26 +39,37 @@ app.use(express.static(path.join(__dirname, 'public')));
 /**
  * 获取区块链概览
  */
-app.get('/api/explorer/overview', (req, res) => {
+app.get('/api/explorer/overview', async (req, res) => {
   try {
-    const stats = blockchain.getStats();
-    const latestBlocks = blockchain.chain
-      .slice(-5)
-      .reverse()
-      .map((block, index) => ({
-        height: blockchain.chain.length - 1 - index,
-        hash: block.hash,
-        timestamp: block.timestamp,
-        transactionCount: block.transactions.length,
-        miner: block.miner,
-        size: block.getSize()
-      }));
+    // 从主节点获取统计信息
+    const statsResult = await fetchFromNode('/api/blockchain/stats');
+    if (!statsResult.success) {
+      throw new Error('无法获取区块链统计信息');
+    }
+
+    // 获取最新5个区块
+    const latestBlocks = [];
+    const currentHeight = statsResult.stats.height;
+    
+    for (let i = Math.max(0, currentHeight - 4); i <= currentHeight; i++) {
+      const blockResult = await fetchFromNode(`/api/blockchain/block/${i}`);
+      if (blockResult.success) {
+        latestBlocks.push({
+          height: blockResult.block.height,
+          hash: blockResult.block.hash,
+          timestamp: blockResult.block.timestamp,
+          transactionCount: blockResult.block.transactions.length,
+          miner: blockResult.block.miner,
+          size: blockResult.block.size
+        });
+      }
+    }
 
     res.json({
       success: true,
       overview: {
-        ...stats,
-        latestBlocks
+        ...statsResult.stats,
+        latestBlocks: latestBlocks.reverse() // 最新的在前
       }
     });
   } catch (error) {
@@ -60,34 +84,48 @@ app.get('/api/explorer/overview', (req, res) => {
 /**
  * 获取区块列表
  */
-app.get('/api/explorer/blocks', (req, res) => {
+app.get('/api/explorer/blocks', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const startIndex = Math.max(0, blockchain.chain.length - (page * limit));
-    const endIndex = Math.max(0, blockchain.chain.length - ((page - 1) * limit));
     
-    const blocks = blockchain.chain
-      .slice(startIndex, endIndex)
-      .reverse()
-      .map((block, index) => ({
-        height: endIndex - 1 - index,
-        hash: block.hash,
-        previousHash: block.previousHash,
-        timestamp: block.timestamp,
-        transactionCount: block.transactions.length,
-        miner: block.miner,
-        nonce: block.nonce,
-        size: block.getSize()
-      }));
+    // 获取总块数
+    const statsResult = await fetchFromNode('/api/blockchain/stats');
+    if (!statsResult.success) {
+      throw new Error('无法获取区块链统计信息');
+    }
+    
+    const totalBlocks = statsResult.stats.totalBlocks;
+    const currentHeight = statsResult.stats.height;
+    
+    // 计算分页
+    const startHeight = Math.max(0, currentHeight - (page * limit) + 1);
+    const endHeight = Math.max(0, currentHeight - ((page - 1) * limit));
+    
+    const blocks = [];
+    for (let height = endHeight; height >= startHeight; height--) {
+      const blockResult = await fetchFromNode(`/api/blockchain/block/${height}`);
+      if (blockResult.success) {
+        blocks.push({
+          height: blockResult.block.height,
+          hash: blockResult.block.hash,
+          previousHash: blockResult.block.previousHash,
+          timestamp: blockResult.block.timestamp,
+          transactionCount: blockResult.block.transactions.length,
+          miner: blockResult.block.miner,
+          nonce: blockResult.block.nonce,
+          size: blockResult.block.size
+        });
+      }
+    }
 
     res.json({
       success: true,
       blocks,
       pagination: {
         currentPage: page,
-        totalPages: Math.ceil(blockchain.chain.length / limit),
-        totalBlocks: blockchain.chain.length,
+        totalPages: Math.ceil(totalBlocks / limit),
+        totalBlocks: totalBlocks,
         limit
       }
     });
@@ -103,23 +141,34 @@ app.get('/api/explorer/blocks', (req, res) => {
 /**
  * 获取交易列表
  */
-app.get('/api/explorer/transactions', (req, res) => {
+app.get('/api/explorer/transactions', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     
+    // 获取区块链统计信息
+    const statsResult = await fetchFromNode('/api/blockchain/stats');
+    if (!statsResult.success) {
+      throw new Error('无法获取区块链统计信息');
+    }
+    
     // 收集所有交易
     const allTransactions = [];
-    blockchain.chain.forEach((block, blockIndex) => {
-      block.transactions.forEach(tx => {
-        allTransactions.push({
-          ...tx.toJSON(),
-          blockHeight: blockIndex,
-          blockHash: block.hash,
-          blockTimestamp: block.timestamp
+    const currentHeight = statsResult.stats.height;
+    
+    for (let height = 0; height <= currentHeight; height++) {
+      const blockResult = await fetchFromNode(`/api/blockchain/block/${height}`);
+      if (blockResult.success) {
+        blockResult.block.transactions.forEach(tx => {
+          allTransactions.push({
+            ...tx,
+            blockHeight: height,
+            blockHash: blockResult.block.hash,
+            blockTimestamp: blockResult.block.timestamp
+          });
         });
-      });
-    });
+      }
+    }
     
     // 按时间排序（最新的在前）
     allTransactions.sort((a, b) => b.timestamp - a.timestamp);
@@ -150,7 +199,7 @@ app.get('/api/explorer/transactions', (req, res) => {
 /**
  * 搜索功能
  */
-app.get('/api/explorer/search/:query', (req, res) => {
+app.get('/api/explorer/search/:query', async (req, res) => {
   try {
     const query = req.params.query.trim();
     const results = {
@@ -162,47 +211,55 @@ app.get('/api/explorer/search/:query', (req, res) => {
     // 搜索区块
     if (/^\d+$/.test(query)) {
       const height = parseInt(query);
-      const block = blockchain.getBlockByHeight(height);
-      if (block) {
+      const blockResult = await fetchFromNode(`/api/blockchain/block/${height}`);
+      if (blockResult.success) {
         results.blocks.push({
           height,
-          hash: block.hash,
-          timestamp: block.timestamp,
-          transactionCount: block.transactions.length
+          hash: blockResult.block.hash,
+          timestamp: blockResult.block.timestamp,
+          transactionCount: blockResult.block.transactions.length
         });
       }
     }
     
     // 搜索哈希（区块或交易）
     if (/^[a-fA-F0-9]{64}$/.test(query)) {
-      // 搜索区块哈希
-      const block = blockchain.getBlockByHash(query);
-      if (block) {
-        const height = blockchain.chain.indexOf(block);
-        results.blocks.push({
-          height,
-          hash: block.hash,
-          timestamp: block.timestamp,
-          transactionCount: block.transactions.length
-        });
+      // 搜索交易哈希
+      const transactionResult = await fetchFromNode(`/api/blockchain/transaction/${query}`);
+      if (transactionResult.success) {
+        results.transactions.push(transactionResult.transaction);
       }
       
-      // 搜索交易哈希
-      const transaction = blockchain.getTransaction(query);
-      if (transaction) {
-        results.transactions.push(transaction);
+      // 如果没找到交易，尝试搜索区块哈希
+      if (results.transactions.length === 0) {
+        const statsResult = await fetchFromNode('/api/blockchain/stats');
+        if (statsResult.success) {
+          for (let height = 0; height <= statsResult.stats.height; height++) {
+            const blockResult = await fetchFromNode(`/api/blockchain/block/${height}`);
+            if (blockResult.success && blockResult.block.hash === query) {
+              results.blocks.push({
+                height,
+                hash: blockResult.block.hash,
+                timestamp: blockResult.block.timestamp,
+                transactionCount: blockResult.block.transactions.length
+              });
+              break;
+            }
+          }
+        }
       }
     }
     
     // 搜索地址
     if (query.length > 0) {
-      const balance = blockchain.getBalance(query);
-      if (balance > 0) {
-        const transactions = blockchain.getAllTransactionsForWallet(query);
+      const balanceResult = await fetchFromNode(`/api/tokens/balance/${query}`);
+      if (balanceResult.success && balanceResult.balance > 0) {
+        const userResult = await fetchFromNode(`/api/users/${query}`);
+        const transactionCount = userResult.success ? userResult.user.transactionCount : 0;
         results.addresses.push({
           address: query,
-          balance,
-          transactionCount: transactions.length
+          balance: balanceResult.balance,
+          transactionCount
         });
       }
     }
@@ -225,22 +282,31 @@ app.get('/api/explorer/search/:query', (req, res) => {
 /**
  * 获取地址详情
  */
-app.get('/api/explorer/address/:address', (req, res) => {
+app.get('/api/explorer/address/:address', async (req, res) => {
   try {
     const address = req.params.address;
-    const balance = blockchain.getBalance(address);
-    const transactions = blockchain.getAllTransactionsForWallet(address);
+    
+    // 从主节点获取用户信息
+    const userResult = await fetchFromNode(`/api/users/${address}`);
+    if (!userResult.success) {
+      return res.status(404).json({
+        success: false,
+        message: '地址不存在或无交易记录'
+      });
+    }
+    
+    const user = userResult.user;
     
     // 计算统计信息
     let totalReceived = 0;
     let totalSent = 0;
     
-    transactions.forEach(tx => {
+    user.transactions.forEach(tx => {
       if (tx.toAddress === address) {
         totalReceived += tx.amount;
       }
       if (tx.fromAddress === address) {
-        totalSent += tx.amount + tx.fee;
+        totalSent += tx.amount + (tx.fee || 0);
       }
     });
 
@@ -248,13 +314,13 @@ app.get('/api/explorer/address/:address', (req, res) => {
       success: true,
       address: {
         address,
-        balance,
+        balance: user.balance,
         totalReceived,
         totalSent,
-        transactionCount: transactions.length,
-        firstSeen: transactions.length > 0 ? Math.min(...transactions.map(tx => tx.timestamp)) : null,
-        lastSeen: transactions.length > 0 ? Math.max(...transactions.map(tx => tx.timestamp)) : null,
-        transactions: transactions.slice(-20) // 最近20笔交易
+        transactionCount: user.transactionCount,
+        firstSeen: user.transactions.length > 0 ? Math.min(...user.transactions.map(tx => tx.timestamp)) : null,
+        lastSeen: user.transactions.length > 0 ? Math.max(...user.transactions.map(tx => tx.timestamp)) : null,
+        transactions: user.transactions.slice(-20) // 最近20笔交易
       }
     });
   } catch (error) {
@@ -267,38 +333,56 @@ app.get('/api/explorer/address/:address', (req, res) => {
 });
 
 // WebSocket 连接处理
-wss.on('connection', (ws) => {
+wss.on('connection', async (ws) => {
   console.log('🔌 浏览器客户端连接');
   
-  // 发送初始数据
-  ws.send(JSON.stringify({
-    type: 'INITIAL_DATA',
-    data: {
-      stats: blockchain.getStats(),
-      latestBlock: blockchain.getLatestBlock().toJSON()
+  try {
+    // 发送初始数据 - 从主节点获取
+    const statsResult = await fetchFromNode('/api/blockchain/stats');
+    const latestBlockResult = await fetchFromNode('/api/blockchain/latest');
+    
+    if (statsResult.success && latestBlockResult.success) {
+      ws.send(JSON.stringify({
+        type: 'INITIAL_DATA',
+        data: {
+          stats: statsResult.stats,
+          latestBlock: latestBlockResult.block
+        }
+      }));
     }
-  }));
+  } catch (error) {
+    console.error('发送初始数据失败:', error);
+  }
   
   ws.on('close', () => {
     console.log('🔌 浏览器客户端断开连接');
   });
 });
 
-// 定时广播更新
-setInterval(() => {
-  const message = JSON.stringify({
-    type: 'STATS_UPDATE',
-    data: {
-      stats: blockchain.getStats(),
-      latestBlock: blockchain.getLatestBlock().toJSON()
+// 定时广播更新 - 从主节点获取数据
+setInterval(async () => {
+  try {
+    const statsResult = await fetchFromNode('/api/blockchain/stats');
+    const latestBlockResult = await fetchFromNode('/api/blockchain/latest');
+    
+    if (statsResult.success && latestBlockResult.success) {
+      const message = JSON.stringify({
+        type: 'STATS_UPDATE',
+        data: {
+          stats: statsResult.stats,
+          latestBlock: latestBlockResult.block
+        }
+      });
+      
+      wss.clients.forEach(client => {
+        if (client.readyState === 1) { // WebSocket.OPEN
+          client.send(message);
+        }
+      });
     }
-  });
-  
-  wss.clients.forEach(client => {
-    if (client.readyState === 1) { // WebSocket.OPEN
-      client.send(message);
-    }
-  });
+  } catch (error) {
+    console.error('广播更新失败:', error);
+  }
 }, 5000); // 每5秒更新一次
 
 // 启动服务器

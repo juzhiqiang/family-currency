@@ -28,12 +28,12 @@ app.listen(PORT, () => {
   console.log(`🚀 Family Currency 区块链节点启动成功!`);
   console.log(`📡 HTTP API 服务: http://localhost:${PORT}`);
   console.log(`🔗 P2P 网络监听: ws://localhost:6001`);
-  console.log(`⛏️  开始挖矿...`);
+  console.log(`⛏️  等待外部挖矿程序连接...`);
   
-  // 开始挖矿
-  setInterval(() => {
-    blockchain.minePendingTransactions('miner-address');
-  }, 10000); // 每10秒尝试挖一个块
+  // 注释掉自动挖矿，让外部挖矿程序处理
+  // setInterval(() => {
+  //   blockchain.minePendingTransactions('miner-address');
+  // }, 10000); // 每10秒尝试挖一个块
 });
 
 // 优雅关闭

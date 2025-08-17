@@ -160,9 +160,14 @@ export class Blockchain {
    * 验证整个区块链
    */
   isChainValid() {
-    const realGenesis = JSON.stringify(this.createGenesisBlock());
-
-    if (realGenesis !== JSON.stringify(this.chain[0])) {
+    // 验证创世区块 - 使用更稳定的比较方法
+    const realGenesis = this.createGenesisBlock();
+    const actualGenesis = this.chain[0];
+    
+    // 比较关键字段而不是完整的JSON序列化
+    if (realGenesis.timestamp !== actualGenesis.timestamp ||
+        realGenesis.previousHash !== actualGenesis.previousHash ||
+        realGenesis.transactions.length !== actualGenesis.transactions.length) {
       console.log('创世区块被篡改!');
       return false;
     }

@@ -45,8 +45,8 @@ export class Wallet {
       });
       return publicKey.export({ type: 'spki', format: 'der' }).toString('hex');
     } catch (error) {
-      // 简化处理：使用私钥哈希作为公钥标识
-      return crypto.createHash('sha256').update(privateKeyHex).digest('hex');
+      // 简化处理：使用私钥哈希作为公钥标识，添加前缀确保一致性
+      return 'simplified_' + crypto.createHash('sha256').update(privateKeyHex).digest('hex');
     }
   }
 
@@ -68,8 +68,9 @@ export class Wallet {
       
       return signature.toString('hex');
     } catch (error) {
-      // 简化签名：使用 HMAC
-      return crypto.createHmac('sha256', privateKeyHex).update(data).digest('hex');
+      // 简化签名：使用 HMAC，需要与公钥生成保持一致
+      const publicKey = this.getPublicKeyFromPrivate(privateKeyHex);
+      return crypto.createHmac('sha256', publicKey).update(data).digest('hex');
     }
   }
 
@@ -78,18 +79,26 @@ export class Wallet {
    */
   static verify(data, signature, publicKeyHex) {
     try {
-      const publicKey = Buffer.from(publicKeyHex, 'hex');
-      const verify = crypto.createVerify('SHA256');
-      verify.update(data);
-      verify.end();
-      
-      return verify.verify({
-        key: publicKey,
-        format: 'der',
-        type: 'spki'
-      }, Buffer.from(signature, 'hex'));
+      // 检查是否使用简化模式
+      if (publicKeyHex.startsWith('simplified_')) {
+        // 简化验证：重新计算签名并比较
+        const expectedSig = crypto.createHmac('sha256', publicKeyHex).update(data).digest('hex');
+        return signature === expectedSig;
+      } else {
+        // 标准验证
+        const publicKey = Buffer.from(publicKeyHex, 'hex');
+        const verify = crypto.createVerify('SHA256');
+        verify.update(data);
+        verify.end();
+        
+        return verify.verify({
+          key: publicKey,
+          format: 'der',
+          type: 'spki'
+        }, Buffer.from(signature, 'hex'));
+      }
     } catch (error) {
-      // 简化验证：重新计算签名并比较
+      // 回退到简化验证
       const expectedSig = crypto.createHmac('sha256', publicKeyHex).update(data).digest('hex');
       return signature === expectedSig;
     }
