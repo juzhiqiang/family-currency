@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Currency - 区块链浏览器</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .hash-text {
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- 导航栏 -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-coins text-2xl"></i>
+                    <h1 class="text-2xl font-bold">Family Currency</h1>
+                    <span class="bg-white bg-opacity-20 px-3 py-1 rounded-full text-sm">区块链浏览器</span>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <div class="flex items-center space-x-2">
+                        <div id="status-indicator" class="w-3 h-3 bg-green-400 rounded-full pulse"></div>
+                        <span id="status-text" class="text-sm">连接中...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <div class="container mx-auto px-6 py-8">
+        <!-- 统计概览 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">当前区块高度</p>
+                        <p id="current-height" class="text-2xl font-bold text-blue-600">-</p>
+                    </div>
+                    <i class="fas fa-cubes text-3xl text-blue-500"></i>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">总交易数</p>
+                        <p id="total-transactions" class="text-2xl font-bold text-green-600">-</p>
+                    </div>
+                    <i class="fas fa-exchange-alt text-3xl text-green-500"></i>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">代币总供应量</p>
+                        <p id="total-supply" class="text-2xl font-bold text-purple-600">-</p>
+                    </div>
+                    <i class="fas fa-coins text-3xl text-purple-500"></i>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-gray-600 text-sm">挖矿难度</p>
+                        <p id="difficulty" class="text-2xl font-bold text-orange-600">-</p>
+                    </div>
+                    <i class="fas fa-hammer text-3xl text-orange-500"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- 搜索栏 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="flex items-center space-x-4">
+                <div class="flex-1">
+                    <input 
+                        type="text" 
+                        id="search-input" 
+                        placeholder="搜索区块高度、哈希值或地址..." 
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                </div>
+                <button 
+                    id="search-btn" 
+                    class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                    <i class="fas fa-search"></i> 搜索
+                </button>
+            </div>
+            <div id="search-results" class="mt-4 hidden"></div>
+        </div>
+
+        <!-- 标签页 -->
+        <div class="bg-white rounded-lg shadow-md">
+            <div class="border-b border-gray-200">
+                <nav class="flex space-x-8 px-6">
+                    <button class="tab-btn py-4 px-2 border-b-2 border-blue-500 text-blue-600 font-medium" data-tab="blocks">
+                        <i class="fas fa-cube mr-2"></i>最新区块
+                    </button>
+                    <button class="tab-btn py-4 px-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="transactions">
+                        <i class="fas fa-exchange-alt mr-2"></i>最新交易
+                    </button>
+                </nav>
+            </div>
+            
+            <!-- 区块列表 -->
+            <div id="blocks-tab" class="tab-content p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold">最新区块</h3>
+                    <button id="refresh-blocks" class="text-blue-500 hover:text-blue-700">
+                        <i class="fas fa-sync-alt"></i> 刷新
+                    </button>
+                </div>
+                <div id="blocks-list" class="space-y-4">
+                    <div class="text-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                        <p class="text-gray-500">正在加载区块数据...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 交易列表 -->
+            <div id="transactions-tab" class="tab-content p-6 hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold">最新交易</h3>
+                    <button id="refresh-transactions" class="text-blue-500 hover:text-blue-700">
+                        <i class="fas fa-sync-alt"></i> 刷新
+                    </button>
+                </div>
+                <div id="transactions-list" class="space-y-4">
+                    <div class="text-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                        <p class="text-gray-500">正在加载交易数据...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class BlockchainExplorer {
+            constructor() {
+                this.currentTab = 'blocks';
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.loadInitialData();
+                
+                // 每5秒刷新一次数据
+                setInterval(() => {
+                    this.loadStats();
+                    if (this.currentTab === 'blocks') {
+                        this.loadBlocks();
+                    }
+                }, 5000);
+            }
+
+            setupEventListeners() {
+                // 标签页切换
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const tab = btn.dataset.tab;
+                        this.switchTab(tab);
+                    });
+                });
+
+                // 搜索功能
+                const searchBtn = document.getElementById('search-btn');
+                const searchInput = document.getElementById('search-input');
+                
+                searchBtn.addEventListener('click', () => this.performSearch());
+                searchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.performSearch();
+                });
+
+                // 刷新按钮
+                document.getElementById('refresh-blocks').addEventListener('click', () => this.loadBlocks());
+                document.getElementById('refresh-transactions').addEventListener('click', () => this.loadTransactions());
+            }
+
+            switchTab(tab) {
+                // 更新按钮样式
+                document.querySelectorAll('.tab-btn').forEach(btn => {
+                    if (btn.dataset.tab === tab) {
+                        btn.className = 'tab-btn py-4 px-2 border-b-2 border-blue-500 text-blue-600 font-medium';
+                    } else {
+                        btn.className = 'tab-btn py-4 px-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700';
+                    }
+                });
+
+                // 显示对应内容
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.getElementById(`${tab}-tab`).classList.remove('hidden');
+
+                this.currentTab = tab;
+
+                // 加载数据
+                if (tab === 'blocks') {
+                    this.loadBlocks();
+                } else if (tab === 'transactions') {
+                    this.loadTransactions();
+                }
+            }
+
+            async loadInitialData() {
+                this.updateStatus('已连接', 'green');
+                await this.loadStats();
+                await this.loadBlocks();
+            }
+
+            updateStatus(text, color) {
+                const indicator = document.getElementById('status-indicator');
+                const statusText = document.getElementById('status-text');
+                
+                indicator.className = `w-3 h-3 rounded-full ${
+                    color === 'green' ? 'bg-green-400 pulse' : 
+                    color === 'red' ? 'bg-red-400' : 'bg-yellow-400'
+                }`;
+                statusText.textContent = text;
+            }
+
+            async loadStats() {
+                try {
+                    const response = await fetch('/api/explorer/overview');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        document.getElementById('current-height').textContent = data.overview.height;
+                        document.getElementById('total-transactions').textContent = data.overview.totalTransactions.toLocaleString();
+                        document.getElementById('total-supply').textContent = data.overview.totalSupply.toFixed(2) + ' FC';
+                        document.getElementById('difficulty').textContent = data.overview.difficulty;
+                    }
+                } catch (error) {
+                    console.error('加载统计数据失败:', error);
+                    this.updateStatus('连接错误', 'red');
+                }
+            }
+
+            async loadBlocks() {
+                try {
+                    const response = await fetch('/api/explorer/blocks?limit=10');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.renderBlocks(data.blocks);
+                    }
+                } catch (error) {
+                    console.error('加载区块数据失败:', error);
+                }
+            }
+
+            renderBlocks(blocks) {
+                const container = document.getElementById('blocks-list');
+                
+                if (blocks.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-8">暂无区块数据</p>';
+                    return;
+                }
+
+                container.innerHTML = blocks.map(block => `
+                    <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center space-x-4">
+                                <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    #${block.height}
+                                </span>
+                                <span class="text-gray-600">${new Date(block.timestamp).toLocaleString()}</span>
+                            </div>
+                            <div class="flex items-center space-x-4 text-sm text-gray-500">
+                                <span><i class="fas fa-exchange-alt mr-1"></i>${block.transactionCount} 交易</span>
+                                <span><i class="fas fa-weight-hanging mr-1"></i>${(block.size / 1024).toFixed(2)} KB</span>
+                            </div>
+                        </div>
+                        <div class="text-sm">
+                            <p class="text-gray-600 mb-1">哈希: <span class="hash-text text-blue-600">${block.hash}</span></p>
+                            <p class="text-gray-600">矿工: <span class="hash-text">${block.miner || '未知'}</span></p>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            async loadTransactions() {
+                try {
+                    const response = await fetch('/api/explorer/transactions?limit=20');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.renderTransactions(data.transactions);
+                    }
+                } catch (error) {
+                    console.error('加载交易数据失败:', error);
+                }
+            }
+
+            renderTransactions(transactions) {
+                const container = document.getElementById('transactions-list');
+                
+                if (transactions.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-8">暂无交易数据</p>';
+                    return;
+                }
+
+                container.innerHTML = transactions.map(tx => `
+                    <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center space-x-4">
+                                <span class="bg-${this.getTypeColor(tx.type)}-100 text-${this.getTypeColor(tx.type)}-800 px-3 py-1 rounded-full text-sm font-medium">
+                                    ${this.getTypeLabel(tx.type)}
+                                </span>
+                                <span class="text-gray-600">${new Date(tx.timestamp).toLocaleString()}</span>
+                            </div>
+                            <div class="text-lg font-semibold text-green-600">
+                                ${tx.amount} FC
+                            </div>
+                        </div>
+                        <div class="text-sm space-y-1">
+                            <p class="text-gray-600">
+                                从: <span class="hash-text">${tx.fromAddress || '系统'}</span>
+                            </p>
+                            <p class="text-gray-600">
+                                到: <span class="hash-text">${tx.toAddress || '销毁'}</span>
+                            </p>
+                            <p class="text-gray-600">
+                                交易ID: <span class="hash-text text-blue-600">${tx.txId}</span>
+                            </p>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            getTypeColor(type) {
+                switch (type) {
+                    case 'mint': return 'green';
+                    case 'transfer': return 'blue';
+                    case 'burn': return 'red';
+                    default: return 'gray';
+                }
+            }
+
+            getTypeLabel(type) {
+                switch (type) {
+                    case 'mint': return '铸造';
+                    case 'transfer': return '转账';
+                    case 'burn': return '销毁';
+                    default: return '未知';
+                }
+            }
+
+            async performSearch() {
+                const query = document.getElementById('search-input').value.trim();
+                if (!query) return;
+
+                try {
+                    const response = await fetch(`/api/explorer/search/${encodeURIComponent(query)}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.renderSearchResults(data.results, data.query);
+                    }
+                } catch (error) {
+                    console.error('搜索失败:', error);
+                }
+            }
+
+            renderSearchResults(results, query) {
+                const container = document.getElementById('search-results');
+                
+                if (results.blocks.length === 0 && results.transactions.length === 0 && results.addresses.length === 0) {
+                    container.innerHTML = `<p class="text-gray-500">未找到关于 "${query}" 的结果</p>`;
+                    container.classList.remove('hidden');
+                    return;
+                }
+
+                let html = '';
+                
+                if (results.blocks.length > 0) {
+                    html += '<h4 class="font-semibold mb-2">区块</h4>';
+                    html += results.blocks.map(block => `
+                        <div class="border border-gray-200 rounded p-3 mb-2 cursor-pointer hover:bg-gray-50">
+                            <p class="font-medium">区块 #${block.height}</p>
+                            <p class="text-sm text-gray-600 hash-text">${block.hash}</p>
+                        </div>
+                    `).join('');
+                }
+                
+                if (results.transactions.length > 0) {
+                    html += '<h4 class="font-semibold mb-2 mt-4">交易</h4>';
+                    html += results.transactions.map(tx => `
+                        <div class="border border-gray-200 rounded p-3 mb-2 cursor-pointer hover:bg-gray-50">
+                            <p class="font-medium">${tx.amount} FC - ${this.getTypeLabel(tx.type)}</p>
+                            <p class="text-sm text-gray-600 hash-text">${tx.txId}</p>
+                        </div>
+                    `).join('');
+                }
+                
+                if (results.addresses.length > 0) {
+                    html += '<h4 class="font-semibold mb-2 mt-4">地址</h4>';
+                    html += results.addresses.map(addr => `
+                        <div class="border border-gray-200 rounded p-3 mb-2">
+                            <p class="font-medium">余额: ${addr.balance} FC</p>
+                            <p class="text-sm text-gray-600 hash-text">${addr.address}</p>
+                        </div>
+                    `).join('');
+                }
+
+                container.innerHTML = html;
+                container.classList.remove('hidden');
+            }
+        }
+
+        // 初始化应用
+        const explorer = new BlockchainExplorer();
+    </script>
+</body>
+</html>

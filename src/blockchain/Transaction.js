@@ -63,9 +63,9 @@ export class Transaction {
    * 验证交易是否有效
    */
   isValid() {
-    // 铸造交易不需要发送方
-    if (this.type === 'mint' && this.fromAddress === null) {
-      return true;
+    // 铸造交易不需要发送方和签名
+    if (this.type === 'mint') {
+      return this.fromAddress === null && this.amount > 0 && this.toAddress;
     }
 
     // 其他交易必须有签名

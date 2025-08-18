@@ -8,6 +8,9 @@ export class Blockchain {
     this.pendingTransactions = [];
     this.miningReward = 100; // 挖矿奖励
     this.accounts = new Map(); // 账户余额
+    
+    // 初始化创世块的账户余额
+    this.updateBalances(this.chain[0]);
   }
 
   /**
@@ -199,8 +202,19 @@ export class Blockchain {
    * 获取区块链统计信息
    */
   getStats() {
-    const totalSupply = Array.from(this.accounts.values())
-      .reduce((sum, balance) => sum + balance, 0);
+    // 正确计算总供应量：遍历所有区块的所有交易
+    let totalSupply = 0;
+    for (const block of this.chain) {
+      for (const trans of block.transactions) {
+        if (trans.type === 'mint') {
+          totalSupply += trans.amount;
+        }
+        // 减去交易手续费（已销毁的代币）
+        if (trans.type === 'transfer') {
+          totalSupply -= trans.getFee();
+        }
+      }
+    }
 
     return {
       height: this.chain.length - 1,

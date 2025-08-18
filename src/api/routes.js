@@ -366,6 +366,168 @@ export function setupRoutes(app, blockchain, p2pNetwork) {
     }
   });
 
+  // ============ 区块链浏览器 API ============
+  
+  /**
+   * 获取概览信息
+   */
+  app.get('/api/explorer/overview', (req, res) => {
+    try {
+      const stats = blockchain.getStats();
+      res.json({
+        success: true,
+        overview: {
+          height: stats.height,
+          totalTransactions: stats.totalTransactions,
+          totalSupply: stats.totalSupply,
+          difficulty: blockchain.difficulty,
+          pendingTransactions: blockchain.pendingTransactions.length
+        }
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: '获取概览信息失败',
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * 获取区块列表
+   */
+  app.get('/api/explorer/blocks', (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit) || 10;
+      const blocks = blockchain.chain
+        .slice(-limit)
+        .reverse()
+        .map((block, index) => ({
+          height: blockchain.chain.length - 1 - index,
+          hash: block.hash,
+          timestamp: block.timestamp,
+          miner: block.miner,
+          transactionCount: block.transactions.length,
+          size: block.getSize()
+        }));
+      
+      res.json({
+        success: true,
+        blocks
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: '获取区块列表失败',
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * 获取交易列表
+   */
+  app.get('/api/explorer/transactions', (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit) || 20;
+      const transactions = [];
+      
+      // 从最新区块开始收集交易
+      for (let i = blockchain.chain.length - 1; i >= 0 && transactions.length < limit; i--) {
+        const block = blockchain.chain[i];
+        for (const tx of block.transactions) {
+          if (transactions.length < limit) {
+            transactions.push(tx.toJSON ? tx.toJSON() : tx);
+          }
+        }
+      }
+      
+      res.json({
+        success: true,
+        transactions
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: '获取交易列表失败',
+        error: error.message
+      });
+    }
+  });
+
+  /**
+   * 搜索功能
+   */
+  app.get('/api/explorer/search/:query', (req, res) => {
+    try {
+      const query = req.params.query;
+      const results = {
+        blocks: [],
+        transactions: [],
+        addresses: []
+      };
+      
+      // 搜索区块（按高度或哈希）
+      if (!isNaN(query)) {
+        const height = parseInt(query);
+        if (height >= 0 && height < blockchain.chain.length) {
+          const block = blockchain.chain[height];
+          results.blocks.push({
+            height,
+            hash: block.hash,
+            timestamp: block.timestamp
+          });
+        }
+      } else {
+        // 按哈希搜索区块
+        blockchain.chain.forEach((block, index) => {
+          if (block.hash.includes(query)) {
+            results.blocks.push({
+              height: index,
+              hash: block.hash,
+              timestamp: block.timestamp
+            });
+          }
+        });
+      }
+      
+      // 搜索交易
+      blockchain.chain.forEach(block => {
+        block.transactions.forEach(tx => {
+          const txData = tx.toJSON ? tx.toJSON() : tx;
+          if (txData.txId.includes(query) || 
+              (txData.fromAddress && txData.fromAddress.includes(query)) ||
+              (txData.toAddress && txData.toAddress.includes(query))) {
+            results.transactions.push(txData);
+          }
+        });
+      });
+      
+      // 搜索地址余额
+      if (query.length > 10) { // 假设地址长度大于10
+        const balance = blockchain.getBalance(query);
+        if (balance > 0) {
+          results.addresses.push({
+            address: query,
+            balance
+          });
+        }
+      }
+      
+      res.json({
+        success: true,
+        query,
+        results
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: '搜索失败',
+        error: error.message
+      });
+    }
+  });
+
   // ============ P2P 网络 API ============
   
   /**

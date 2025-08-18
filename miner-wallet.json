@@ -1,0 +1,6 @@
+{
+  "publicKey": "3056301006072a8648ce3d020106052b8104000a034200045ef7d5122eb94e651f6ba283b6e883503a0c5ddc4aebbd6c8e20811b595dce3f739fe3dbbd0c3e26ce50ce16cb467f446516a7bef1aa8c72fb9ccf436db5b188",
+  "privateKey": "existing_miner_private_key_placeholder",
+  "createdAt": "2025-08-17T07:00:00.000Z",
+  "note": "这是当前正在挖矿的地址，已有200个FC余额"
+}

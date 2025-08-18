@@ -1,8 +1,10 @@
 import { Wallet } from '../crypto/Wallet.js';
+import fs from 'fs';
+import path from 'path';
 
 class Miner {
   constructor() {
-    this.wallet = Wallet.generate();
+    this.wallet = this.loadOrCreateWallet();
     this.isRunning = false;
     this.hashRate = 0;
     this.totalHashes = 0;
@@ -12,6 +14,48 @@ class Miner {
     this.difficulty = 2; // 默认难度
     this.retryCount = 0;
     this.maxRetries = 10;
+  }
+
+  /**
+   * 加载或创建钱包
+   */
+  loadOrCreateWallet() {
+    const walletPath = path.join(process.cwd(), 'miner-wallet.json');
+    
+    try {
+      if (fs.existsSync(walletPath)) {
+        const walletData = JSON.parse(fs.readFileSync(walletPath, 'utf8'));
+        console.log('📁 加载已有钱包...');
+        
+        // 从保存的数据创建钱包
+        const wallet = new Wallet();
+        wallet.publicKey = walletData.publicKey;
+        wallet.privateKey = walletData.privateKey;
+        
+        return wallet;
+      }
+    } catch (error) {
+      console.log('⚠️  加载钱包失败，将创建新钱包:', error.message);
+    }
+    
+    // 创建新钱包并保存
+    console.log('🆕 创建新的矿工钱包...');
+    const wallet = Wallet.generate();
+    
+    try {
+      const walletData = {
+        publicKey: wallet.publicKey,
+        privateKey: wallet.privateKey,
+        createdAt: new Date().toISOString()
+      };
+      
+      fs.writeFileSync(walletPath, JSON.stringify(walletData, null, 2));
+      console.log('💾 钱包已保存到:', walletPath);
+    } catch (error) {
+      console.log('⚠️  保存钱包失败:', error.message);
+    }
+    
+    return wallet;
   }
 
   /**
