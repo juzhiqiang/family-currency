@@ -107,7 +107,7 @@ export function setupRoutes(app, blockchain, p2pNetwork) {
   app.post('/api/tokens/transfer', (req, res) => {
     try {
       const { fromAddress, toAddress, amount, privateKey } = req.body;
-      
+      console.log(fromAddress, toAddress, amount, privateKey)
       if (!fromAddress || !toAddress || !amount || !privateKey || amount <= 0) {
         return res.status(400).json({
           success: false,
@@ -324,6 +324,12 @@ export function setupRoutes(app, blockchain, p2pNetwork) {
         });
       }
       
+      // 从区块中找到挖矿奖励交易来获取实际奖励金额
+      const rewardTransaction = block.transactions.find(tx => 
+        tx.type === 'mint' && tx.toAddress === minerAddress
+      );
+      const actualReward = rewardTransaction ? rewardTransaction.amount : 0;
+      
       // 广播新区块到P2P网络
       if (p2pNetwork) {
         p2pNetwork.broadcastBlock(block);
@@ -332,7 +338,8 @@ export function setupRoutes(app, blockchain, p2pNetwork) {
       res.json({
         success: true,
         message: '挖矿成功',
-        block: block.toJSON()
+        block: block.toJSON(),
+        reward: actualReward
       });
     } catch (error) {
       res.status(500).json({

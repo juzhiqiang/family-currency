@@ -68,7 +68,7 @@ app.post('/api/wallet/generate', (req, res) => {
 /**
  * 从私钥导入钱包
  */
-app.post('/api/wallet/import', (req, res) => {
+app.post('/api/wallet/import', async (req, res) => {
   try {
     const { privateKey } = req.body;
     
@@ -79,12 +79,29 @@ app.post('/api/wallet/import', (req, res) => {
       });
     }
 
+    // 从私钥恢复钱包
     const wallet = Wallet.fromPrivateKey(privateKey);
     const walletInfo = wallet.getWalletInfo();
+    console.log(walletInfo)
+    
+    // 获取钱包地址对应的用户信息
+    const userResult = await fetchFromNode(`/api/users/${walletInfo.address}`);
+    
+    let userInfo = null;
+    if (userResult.success) {
+      userInfo = userResult.user;
+    }
     
     res.json({
       success: true,
-      wallet: walletInfo,
+      wallet: {
+        ...walletInfo,
+        // 如果用户存在，添加用户相关信息
+        balance: userInfo ? userInfo.balance : 0,
+        transactionCount: userInfo ? userInfo.transactionCount : 0,
+        hasTransactions: userInfo ? userInfo.transactionCount > 0 : false
+      },
+      user: userInfo,
       message: '钱包导入成功'
     });
   } catch (error) {

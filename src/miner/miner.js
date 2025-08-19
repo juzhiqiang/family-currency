@@ -195,7 +195,7 @@ class Miner {
         console.log(`   区块高度: ${result.block.height || 'unknown'}`);
         console.log(`   区块哈希: ${result.block.hash}`);
         console.log(`   挖矿耗时: ${duration.toFixed(2)}秒`);
-        console.log(`   获得奖励: ${this.miningReward} FC`);
+        console.log(`   获得奖励: ${result.reward || '随机'} FC`);
         console.log('─'.repeat(60));
       } else if (result && !result.success) {
         console.log(`⚠️  ${result.message || '挖矿失败'}`);

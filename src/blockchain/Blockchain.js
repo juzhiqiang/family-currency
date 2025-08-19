@@ -43,10 +43,13 @@ export class Blockchain {
       return null;
     }
 
+    // 生成1-100的随机挖矿奖励
+    const randomReward = Math.floor(Math.random() * 100) + 1;
+    
     // 添加挖矿奖励交易
     const rewardTransaction = Transaction.createMintTransaction(
       miningRewardAddress,
-      this.miningReward
+      randomReward
     );
     this.pendingTransactions.push(rewardTransaction);
 

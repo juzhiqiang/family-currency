@@ -116,6 +116,192 @@
             <div id="search-results" class="mt-4 hidden"></div>
         </div>
 
+        <!-- 钱包管理区域 -->
+        <div class="bg-white rounded-lg shadow-md mb-8">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">
+                        <i class="fas fa-wallet mr-2 text-blue-500"></i>钱包管理
+                    </h2>
+                    <div class="flex space-x-3">
+                        <button id="create-wallet-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                            <i class="fas fa-plus mr-2"></i>创建钱包
+                        </button>
+                        <button id="import-wallet-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors">
+                            <i class="fas fa-download mr-2"></i>导入钱包
+                        </button>
+                        <button id="transfer-btn" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors" disabled>
+                            <i class="fas fa-paper-plane mr-2"></i>转账
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 当前钱包信息 -->
+                <div id="current-wallet" class="hidden">
+                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-semibold text-gray-700">当前钱包</h3>
+                            <span id="wallet-balance" class="text-lg font-bold text-blue-600">0.00 FC</span>
+                        </div>
+                        <div class="space-y-2 text-sm">
+                            <div>
+                                <span class="text-gray-600">地址：</span>
+                                <span id="wallet-address" class="hash-text font-mono text-gray-800 break-all"></span>
+                                <button id="copy-address" class="ml-2 text-blue-500 hover:text-blue-700">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                            <div>
+                                <span class="text-gray-600">名称：</span>
+                                <span id="wallet-name" class="text-gray-800"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 钱包列表 -->
+                <div id="wallet-list" class="space-y-3"></div>
+                
+                <!-- 无钱包提示 -->
+                <div id="no-wallet" class="text-center py-8 text-gray-500">
+                    <i class="fas fa-wallet text-4xl mb-4 text-gray-300"></i>
+                    <p class="text-lg">还没有钱包</p>
+                    <p class="text-sm">创建或导入一个钱包开始使用</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 转账模态框 -->
+        <div id="transfer-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+            <div class="flex items-center justify-center min-h-screen p-4">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold">代币转账</h3>
+                            <button id="close-transfer-modal" class="text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                        <form id="transfer-form">
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    发送方钱包
+                                </label>
+                                <div class="bg-gray-50 p-3 rounded-lg">
+                                    <p class="font-medium text-gray-800" id="sender-wallet-name"></p>
+                                    <p class="text-sm text-gray-600 hash-text break-all" id="sender-wallet-address"></p>
+                                    <p class="text-sm font-semibold text-blue-600" id="sender-wallet-balance"></p>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label for="recipient-address" class="block text-sm font-medium text-gray-700 mb-2">
+                                    接收方地址
+                                </label>
+                                <input type="text" id="recipient-address" placeholder="输入接收方钱包地址"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm">
+                            </div>
+                            <div class="mb-4">
+                                <label for="transfer-amount" class="block text-sm font-medium text-gray-700 mb-2">
+                                    转账金额 (FC)
+                                </label>
+                                <input type="number" id="transfer-amount" placeholder="0.00" step="0.01" min="0.01"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                <p class="text-xs text-gray-500 mt-1">最小转账金额: 0.01 FC</p>
+                            </div>
+                            <div class="mb-6">
+                                <label for="transfer-note" class="block text-sm font-medium text-gray-700 mb-2">
+                                    备注 (可选)
+                                </label>
+                                <input type="text" id="transfer-note" placeholder="转账备注"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            </div>
+                            <div class="flex space-x-3">
+                                <button type="button" id="cancel-transfer" class="flex-1 px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+                                    取消
+                                </button>
+                                <button type="submit" class="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600">
+                                    <i class="fas fa-paper-plane mr-2"></i>发送
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 创建钱包模态框 -->
+        <div id="create-wallet-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+            <div class="flex items-center justify-center min-h-screen p-4">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold">创建新钱包</h3>
+                            <button id="close-create-modal" class="text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                        <form id="create-wallet-form">
+                            <div class="mb-4">
+                                <label for="wallet-name-input" class="block text-sm font-medium text-gray-700 mb-2">
+                                    钱包名称
+                                </label>
+                                <input type="text" id="wallet-name-input" placeholder="输入钱包名称"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="flex space-x-3">
+                                <button type="button" id="cancel-create" class="flex-1 px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+                                    取消
+                                </button>
+                                <button type="submit" class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                                    创建钱包
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 导入钱包模态框 -->
+        <div id="import-wallet-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+            <div class="flex items-center justify-center min-h-screen p-4">
+                <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold">导入钱包</h3>
+                            <button id="close-import-modal" class="text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-times text-xl"></i>
+                            </button>
+                        </div>
+                        <form id="import-wallet-form">
+                            <div class="mb-4">
+                                <label for="import-wallet-name" class="block text-sm font-medium text-gray-700 mb-2">
+                                    钱包名称
+                                </label>
+                                <input type="text" id="import-wallet-name" placeholder="输入钱包名称"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="mb-4">
+                                <label for="private-key-input" class="block text-sm font-medium text-gray-700 mb-2">
+                                    私钥
+                                </label>
+                                <textarea id="private-key-input" placeholder="输入私钥" rows="3"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"></textarea>
+                            </div>
+                            <div class="flex space-x-3">
+                                <button type="button" id="cancel-import" class="flex-1 px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+                                    取消
+                                </button>
+                                <button type="submit" class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
+                                    导入钱包
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 标签页 -->
         <div class="bg-white rounded-lg shadow-md">
             <div class="border-b border-gray-200">
@@ -167,16 +353,21 @@
         class BlockchainExplorer {
             constructor() {
                 this.currentTab = 'blocks';
+                this.wallets = JSON.parse(localStorage.getItem('wallets') || '[]');
+                this.currentWalletIndex = parseInt(localStorage.getItem('currentWalletIndex') || '-1');
                 this.init();
             }
 
             init() {
                 this.setupEventListeners();
                 this.loadInitialData();
+                this.setupWalletManagement();
+                this.loadWallets();
                 
                 // 每5秒刷新一次数据
                 setInterval(() => {
                     this.loadStats();
+                    this.updateWalletBalances();
                     if (this.currentTab === 'blocks') {
                         this.loadBlocks();
                     }
@@ -435,6 +626,370 @@
 
                 container.innerHTML = html;
                 container.classList.remove('hidden');
+            }
+
+            // ============ 钱包管理功能 ============
+
+            setupWalletManagement() {
+                // 创建钱包按钮
+                document.getElementById('create-wallet-btn').addEventListener('click', () => {
+                    document.getElementById('create-wallet-modal').classList.remove('hidden');
+                });
+
+                // 导入钱包按钮
+                document.getElementById('import-wallet-btn').addEventListener('click', () => {
+                    document.getElementById('import-wallet-modal').classList.remove('hidden');
+                });
+
+                // 转账按钮
+                document.getElementById('transfer-btn').addEventListener('click', () => {
+                    this.openTransferModal();
+                });
+
+                // 模态框关闭按钮
+                document.getElementById('close-create-modal').addEventListener('click', () => {
+                    this.closeCreateModal();
+                });
+                document.getElementById('close-import-modal').addEventListener('click', () => {
+                    this.closeImportModal();
+                });
+                document.getElementById('close-transfer-modal').addEventListener('click', () => {
+                    this.closeTransferModal();
+                });
+                document.getElementById('cancel-create').addEventListener('click', () => {
+                    this.closeCreateModal();
+                });
+                document.getElementById('cancel-import').addEventListener('click', () => {
+                    this.closeImportModal();
+                });
+                document.getElementById('cancel-transfer').addEventListener('click', () => {
+                    this.closeTransferModal();
+                });
+
+                // 创建钱包表单
+                document.getElementById('create-wallet-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    await this.createWallet();
+                });
+
+                // 导入钱包表单
+                document.getElementById('import-wallet-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    await this.importWallet();
+                });
+
+                // 转账表单
+                document.getElementById('transfer-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    await this.performTransfer();
+                });
+
+                // 复制地址按钮
+                document.getElementById('copy-address').addEventListener('click', () => {
+                    this.copyToClipboard(document.getElementById('wallet-address').textContent);
+                });
+
+                // 点击模态框背景关闭
+                document.getElementById('create-wallet-modal').addEventListener('click', (e) => {
+                    if (e.target.id === 'create-wallet-modal') {
+                        this.closeCreateModal();
+                    }
+                });
+                document.getElementById('import-wallet-modal').addEventListener('click', (e) => {
+                    if (e.target.id === 'import-wallet-modal') {
+                        this.closeImportModal();
+                    }
+                });
+                document.getElementById('transfer-modal').addEventListener('click', (e) => {
+                    if (e.target.id === 'transfer-modal') {
+                        this.closeTransferModal();
+                    }
+                });
+            }
+
+            async createWallet() {
+                const name = document.getElementById('wallet-name-input').value.trim();
+                if (!name) {
+                    alert('请输入钱包名称');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/wallet/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        const wallet = {
+                            id: Date.now(),
+                            name: name,
+                            address: data.wallet.address,
+                            publicKey: data.wallet.publicKey,
+                            privateKey: data.wallet.privateKey,
+                            balance: 0,
+                            createdAt: new Date().toISOString()
+                        };
+
+                        this.wallets.push(wallet);
+                        this.currentWalletIndex = this.wallets.length - 1;
+                        this.saveWallets();
+                        this.loadWallets();
+                        this.closeCreateModal();
+                        
+                        alert('钱包创建成功！');
+                    } else {
+                        alert('创建钱包失败：' + data.message);
+                    }
+                } catch (error) {
+                    console.error('创建钱包失败:', error);
+                    alert('创建钱包失败，请稍后重试');
+                }
+            }
+
+            async importWallet() {
+                const name = document.getElementById('import-wallet-name').value.trim();
+                const privateKey = document.getElementById('private-key-input').value.trim();
+                
+                if (!name || !privateKey) {
+                    alert('请填写完整信息');
+                    return;
+                }
+
+                try {
+                    
+                    // 使用 /api/users/:address 接口获取用户信息
+                    const response = await fetch(`/api/wallet/import`,{
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ privateKey })
+                    });
+                    const data = await response.json();
+
+                    if (data.success) {
+                        // 获取钱包余额
+                        const balanceResponse = await fetch(`/api/wallet/balance/${data.wallet.address}`);
+                        const balanceData = await balanceResponse.json();
+                        
+                        const wallet = {
+                            id: Date.now(),
+                            name: name,
+                            address: data.wallet.address,
+                            publicKey: data.wallet.publicKey,
+                            privateKey: data.wallet.privateKey,
+                            balance: balanceData.success ? balanceData.balance : 0,
+                            createdAt: new Date().toISOString()
+                        };
+
+                        this.wallets.push(wallet);
+                        this.currentWalletIndex = this.wallets.length - 1;
+                        this.saveWallets();
+                        this.loadWallets();
+                        this.closeImportModal();
+                        
+                        alert('钱包导入成功！');
+                    } else {
+                        alert('导入钱包失败：' + data.message);
+                    }
+                } catch (error) {
+                    console.error('导入钱包失败:', error);
+                    alert('导入钱包失败，请检查私钥格式');
+                }
+            }
+
+            loadWallets() {
+                const currentWalletDiv = document.getElementById('current-wallet');
+                const walletListDiv = document.getElementById('wallet-list');
+                const noWalletDiv = document.getElementById('no-wallet');
+
+                if (this.wallets.length === 0) {
+                    currentWalletDiv.classList.add('hidden');
+                    walletListDiv.innerHTML = '';
+                    noWalletDiv.classList.remove('hidden');
+                    return;
+                }
+
+                noWalletDiv.classList.add('hidden');
+                // 禁用转账按钮
+                document.getElementById('transfer-btn').disabled = true;
+
+                // 显示当前钱包
+                if (this.currentWalletIndex >= 0 && this.currentWalletIndex < this.wallets.length) {
+                    const currentWallet = this.wallets[this.currentWalletIndex];
+                    document.getElementById('wallet-name').textContent = currentWallet.name;
+                    document.getElementById('wallet-address').textContent = currentWallet.address;
+                    document.getElementById('wallet-balance').textContent = `${currentWallet.balance.toFixed(2)} FC`;
+                    currentWalletDiv.classList.remove('hidden');
+                    
+                    // 启用转账按钮
+                    document.getElementById('transfer-btn').disabled = false;
+                } else {
+                    // 禁用转账按钮
+                    document.getElementById('transfer-btn').disabled = true;
+                }
+
+                // 显示钱包列表
+                walletListDiv.innerHTML = this.wallets.map((wallet, index) => `
+                    <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer ${index === this.currentWalletIndex ? 'bg-blue-50 border-blue-300' : ''}"
+                         onclick="explorer.switchWallet(${index})">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="font-medium text-gray-800">${wallet.name}</h4>
+                                <p class="text-sm text-gray-600 hash-text">${wallet.address}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="font-semibold text-blue-600">${wallet.balance.toFixed(2)} FC</p>
+                                <p class="text-sm text-gray-500">${index === this.currentWalletIndex ? '当前' : '切换'}</p>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            switchWallet(index) {
+                if (index >= 0 && index < this.wallets.length) {
+                    this.currentWalletIndex = index;
+                    this.saveWallets();
+                    this.loadWallets();
+                }
+            }
+
+            async updateWalletBalances() {
+                if (this.wallets.length === 0) return;
+
+                for (let i = 0; i < this.wallets.length; i++) {
+                    try {
+                        const response = await fetch(`/api/wallet/balance/${this.wallets[i].address}`);
+                        const data = await response.json();
+                        if (data.success) {
+                            this.wallets[i].balance = data.balance;
+                        }
+                    } catch (error) {
+                        console.error('更新钱包余额失败:', error);
+                    }
+                }
+                
+                this.saveWallets();
+                this.loadWallets();
+            }
+
+            saveWallets() {
+                localStorage.setItem('wallets', JSON.stringify(this.wallets));
+                localStorage.setItem('currentWalletIndex', this.currentWalletIndex.toString());
+            }
+
+            closeCreateModal() {
+                document.getElementById('create-wallet-modal').classList.add('hidden');
+                document.getElementById('wallet-name-input').value = '';
+            }
+
+            closeImportModal() {
+                document.getElementById('import-wallet-modal').classList.add('hidden');
+                document.getElementById('import-wallet-name').value = '';
+                document.getElementById('private-key-input').value = '';
+            }
+
+            copyToClipboard(text) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('地址已复制到剪贴板');
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                    // 回退方案
+                    const textArea = document.createElement('textarea');
+                    textArea.value = text;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    alert('地址已复制到剪贴板');
+                });
+            }
+
+            openTransferModal() {
+                if (this.currentWalletIndex < 0 || this.currentWalletIndex >= this.wallets.length) {
+                    alert('请先选择一个钱包');
+                    return;
+                }
+
+                const currentWallet = this.wallets[this.currentWalletIndex];
+                document.getElementById('sender-wallet-name').textContent = currentWallet.name;
+                document.getElementById('sender-wallet-address').textContent = currentWallet.address;
+                document.getElementById('sender-wallet-balance').textContent = `余额: ${currentWallet.balance.toFixed(2)} FC`;
+                
+                document.getElementById('transfer-modal').classList.remove('hidden');
+            }
+
+            closeTransferModal() {
+                document.getElementById('transfer-modal').classList.add('hidden');
+                document.getElementById('recipient-address').value = '';
+                document.getElementById('transfer-amount').value = '';
+                document.getElementById('transfer-note').value = '';
+            }
+
+            async performTransfer() {
+                const recipientAddress = document.getElementById('recipient-address').value.trim();
+                const amount = parseFloat(document.getElementById('transfer-amount').value);
+                const note = document.getElementById('transfer-note').value.trim();
+
+                if (!recipientAddress || !amount) {
+                    alert('请填写完整的转账信息');
+                    return;
+                }
+
+                if (amount <= 0) {
+                    alert('转账金额必须大于0');
+                    return;
+                }
+
+                const currentWallet = this.wallets[this.currentWalletIndex];
+                if (amount > currentWallet.balance) {
+                    alert('余额不足');
+                    return;
+                }
+
+                if (recipientAddress === currentWallet.address) {
+                    alert('不能转账给自己');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/transaction/send', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            fromAddress: currentWallet.address,
+                            toAddress: recipientAddress,
+                            amount: amount,
+                            privateKey: currentWallet.privateKey,
+                            note: note || undefined
+                        })
+                    });
+
+                    const data = await response.json();
+                    console.log('转账响应:', data);
+                    if (data.success) {
+                        alert(`转账成功！交易ID: ${data.transaction.txId}`);
+                        this.closeTransferModal();
+                        // 更新钱包余额
+                        await this.updateWalletBalances();
+                        // 刷新交易列表
+                        if (this.currentTab === 'transactions') {
+                            this.loadTransactions();
+                        }
+                    } else {
+                        alert('转账失败：' + data.message);
+                    }
+                } catch (error) {
+                    console.error('转账失败:', error);
+                    alert('转账失败，请稍后重试');
+                }
             }
         }
 
