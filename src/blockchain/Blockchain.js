@@ -18,7 +18,7 @@ export class Blockchain {
    */
   createGenesisBlock() {
     const genesisTransactions = [
-      Transaction.createMintTransaction('genesis-address', 1000000)
+      Transaction.createMintTransaction('genesis-address', 10)
     ];
     return new Block(
       Date.parse('2025-01-01'),
